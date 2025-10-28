@@ -7,13 +7,17 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
 import os
 
-# ✅ إنشاء التطبيق
 app = FastAPI()
 
-# ✅ إعداد CORS
+# ✅ هنا ضع نطاقاتك المسموح بها فقط
+origins = [
+    "http://localhost:5173",  # للتجريب محليًا
+    "https://perfume-label-frontend.vercel.app"  # موقعك المنشور
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # يمكنك لاحقًا وضع ["http://localhost:5173"]
+    allow_origins=origins,      # لا تتركها "*"
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
