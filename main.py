@@ -59,11 +59,11 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
                 c.drawImage(logo, x + (label_size - 30) / 2, y + label_size - 40, 30, 30, mask="auto")
 
             # ✅ اسم العطر (بخط أكبر)
-            c.setFont("Helvetica-Bold", 10)
+            c.setFont("Helvetica-BoldOblique", 10)
             c.drawCentredString(x + label_size / 2, y + label_size / 2 + 13, perfume_name)
 
             # ✅ اسم المحل
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Italic", 8)
             c.drawCentredString(x + label_size / 2, y + label_size / 2, shop_name)
 
             # ✅ السعر والضرب يظهران بوضوح أسفل الاسم
