@@ -51,7 +51,8 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
             # ✅ الإطار الأساسي
             c.setLineWidth(1)
             c.setStrokeColor(colors.black)
-            c.roundRect(x + 3, y + 3, label_size - 6, label_size - 6, r=8, stroke=1, fill=0)
+            c.roundRect(x + 3, y + 3, label_size - 6, label_size - 6, 8, stroke=1, fill=0)
+
 
             # ✅ اللوجو في الأعلى
             if logo:
