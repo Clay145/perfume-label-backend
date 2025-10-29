@@ -64,7 +64,7 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
 
             # ✅ اسم المحل
             c.setFont("Times-Italic", 8)
-            c.drawCentredString(x + label_size / 2, y + label_size / 2 + 5, shop_name)
+            c.drawCentredString(x + label_size / 2, y + label_size / 2 - 5, shop_name)
 
             # ✅ السعر والضرب يظهران بوضوح أسفل الاسم
             if price or multiplier:
