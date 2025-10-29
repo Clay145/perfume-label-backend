@@ -60,7 +60,7 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
 
             # ✅ اسم العطر (بخط أكبر)
             c.setFont("Helvetica-Bold", 10)
-            c.drawCentredString(x + label_size / 2, y + label_size / 2 + 18, perfume_name)
+            c.drawCentredString(x + label_size / 2, y + label_size / 2 + 13, perfume_name)
 
             # ✅ اسم المحل
             c.setFont("Helvetica", 8)
@@ -71,7 +71,7 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
                 c.setFont("Helvetica-Bold", 9)
                 display_text = ""
                 if price:
-                    display_text += f" Prix: {price} "
+                    display_text += f" Prix(DA): {price} "
                 if multiplier:
                     display_text += f"  (×{multiplier})"
                 c.drawCentredString(x + label_size / 2, y + 20, display_text.strip())
