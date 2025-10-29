@@ -40,28 +40,42 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
 
         logo = None
         if os.path.exists(logo_path):
-            logo = ImageReader(logo_path)
+            try:
+                logo = ImageReader(logo_path)
+            except Exception as e:
+                print("⚠️ خطأ في تحميل اللوجو:", e)
+        else:
+            print("⚠️ لم يتم العثور على logo.png")
 
         def draw_label(x, y):
+            # ✅ الإطار الأساسي
             c.setLineWidth(1)
             c.setStrokeColor(colors.black)
             c.roundRect(x + 3, y + 3, label_size - 6, label_size - 6, r=8, stroke=1, fill=0)
 
-            # اللوجو
+            # ✅ اللوجو في الأعلى
             if logo:
-                c.drawImage(logo, x + (label_size - 30) / 2, y + label_size - 38, 30, 30, mask="auto")
+                c.drawImage(logo, x + (label_size - 30) / 2, y + label_size - 40, 30, 30, mask="auto")
 
-            # النصوص
+            # ✅ اسم العطر (بخط أكبر)
             c.setFont("Helvetica-Bold", 10)
-            c.drawCentredString(x + label_size / 2, y + label_size / 2 + 15, perfume_name)
+            c.drawCentredString(x + label_size / 2, y + label_size / 2 + 18, perfume_name)
+
+            # ✅ اسم المحل
             c.setFont("Helvetica", 8)
-            c.drawCentredString(x + label_size / 2, y + label_size / 2 - 5, shop_name)
+            c.drawCentredString(x + label_size / 2, y + label_size / 2, shop_name)
 
-            # السعر والضرب
+            # ✅ السعر والضرب يظهران بوضوح أسفل الاسم
             if price or multiplier:
-                c.setFont("Helvetica", 7)
-                c.drawCentredString(x + label_size / 2, y + 15, f"{price} {multiplier}".strip())
+                c.setFont("Helvetica-Bold", 9)
+                display_text = ""
+                if price:
+                    display_text += f"السعر: {price} "
+                if multiplier:
+                    display_text += f"({multiplier})"
+                c.drawCentredString(x + label_size / 2, y + 20, display_text.strip())
 
+        # ✅ رسم عدد الملصقات المطلوب
         count = 0
         for row in range(rows):
             for col in range(cols):
@@ -75,7 +89,7 @@ def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplie
                 break
 
         c.save()
-        print(f"✅ PDF جاهز بعدد {copies} ملصقات")
+        print(f"✅ PDF جاهز بعدد {copies} ملصقات (السعر والضرب مضافان)")
         return FileResponse(file_path, media_type="application/pdf", filename="labels.pdf")
 
     except Exception as e:
