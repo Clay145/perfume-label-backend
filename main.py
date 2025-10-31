@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from reportlab.lib.pagesizes import A4
+from pydantic import BaseModel
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
 import os
+
 
 app = FastAPI()
 
@@ -22,75 +24,97 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/generate_label")
-def generate_label(perfume_name: str, shop_name: str, price: str = "", multiplier: str = "", copies: int = 1):
+
+# ✅ نموذج البيانات التي سيستقبلها السيرفر
+class LabelSettings(BaseModel):
+    perfume_name: str
+    shop_name: str
+    price: str | None = ""
+    multiplier: str | None = ""
+    copies: int = 1
+    label_width: float = 113.39  # افتراضي: 4 سم
+    label_height: float = 113.39
+    font_perfume: int = 10
+    font_shop: int = 8
+    font_price: int = 9
+    extra_fields: list[dict] | None = None
+
+
+@app.post("/generate_label")
+def generate_label(settings: LabelSettings):
     try:
         file_path = "labels.pdf"
         c = canvas.Canvas(file_path, pagesize=A4)
-
-        width, height = A4
-        label_size = 113.39  # 4 سم
+        page_width, page_height = A4
         margin = 10
 
-        cols = int((width - margin) // label_size)
-        rows = int((height - margin) // label_size)
-
+        # تحميل اللوجو إن وجد
         base_dir = os.path.dirname(os.path.abspath(__file__))
         logo_path = os.path.join(base_dir, "logo.png")
+        logo = ImageReader(logo_path) if os.path.exists(logo_path) else None
 
-        logo = None
-        if os.path.exists(logo_path):
-            try:
-                logo = ImageReader(logo_path)
-            except Exception as e:
-                print("⚠️ خطأ في تحميل اللوجو:", e)
-        else:
-            print("⚠️ لم يتم العثور على logo.png")
+        cols = int((page_width - margin) // settings.label_width)
+        rows = int((page_height - margin) // settings.label_height)
 
         def draw_label(x, y):
-            # ✅ الإطار الأساسي
+            # إطار الملصق
             c.setLineWidth(1)
             c.setStrokeColor(colors.black)
-            c.roundRect(x + 3, y + 3, label_size - 6, label_size - 6, 8, stroke=1, fill=0)
+            c.roundRect(x + 3, y + 3, settings.label_width - 6, settings.label_height - 6, 8, stroke=1, fill=0)
 
-
-            # ✅ اللوجو في الأعلى
+            # اللوجو في الأعلى
             if logo:
-                c.drawImage(logo, x + (label_size - 30) / 2, y + label_size - 40, 30, 30, mask="auto")
+                c.drawImage(
+                    logo,
+                    x + (settings.label_width - 30) / 2,
+                    y + settings.label_height - 40,
+                    30,
+                    30,
+                    mask="auto"
+                )
 
-            # ✅ اسم العطر (بخط أكبر)
-            c.setFont("Helvetica-BoldOblique", 10)
-            c.drawCentredString(x + label_size / 2, y + label_size / 2 + 10, perfume_name)
+            # اسم العطر
+            c.setFont("Helvetica-Bold", settings.font_perfume)
+            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 + 10, settings.perfume_name)
 
-            # ✅ اسم المحل
-            c.setFont("Times-Italic", 8)
-            c.drawCentredString(x + label_size / 2, y + label_size / 2, shop_name)
+            # اسم المحل
+            c.setFont("Times-Italic", settings.font_shop)
+            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 - 5, settings.shop_name)
 
-            # ✅ السعر والضرب يظهران بوضوح أسفل الاسم
-            if price or multiplier:
-                c.setFont("Helvetica-Bold", 9)
-                display_text = ""
-                if price:
-                    display_text += f" Prix(DA): {price} "
-                if multiplier:
-                    display_text += f"  (×{multiplier})"
-                c.drawCentredString(x + label_size / 2, y + 20, display_text.strip())
+            # السعر والضرب
+            if settings.price or settings.multiplier:
+                c.setFont("Helvetica-Bold", settings.font_price)
+                text = ""
+                if settings.price:
+                    text += f"DA {settings.price} "
+                if settings.multiplier:
+                    text += f"({settings.multiplier})"
+                c.drawCentredString(x + settings.label_width / 2, y + 20, text.strip())
 
-        # ✅ رسم عدد الملصقات المطلوب
+            # الحقول الإضافية
+            if settings.extra_fields:
+                c.setFont("Helvetica", 7)
+                y_offset = 10
+                for field in settings.extra_fields:
+                    label_text = f"{field['label']}: {field['value']}"
+                    c.drawCentredString(x + settings.label_width / 2, y + y_offset, label_text)
+                    y_offset -= 10
+
+        # رسم عدد الملصقات
         count = 0
         for row in range(rows):
             for col in range(cols):
-                if count >= copies:
+                if count >= settings.copies:
                     break
-                x = margin + col * label_size
-                y = height - margin - label_size - row * label_size
+                x = margin + col * settings.label_width
+                y = page_height - margin - settings.label_height - row * settings.label_height
                 draw_label(x, y)
                 count += 1
-            if count >= copies:
+            if count >= settings.copies:
                 break
 
         c.save()
-        print(f"✅ PDF جاهز بعدد {copies} ملصقات (السعر والضرب مضافان)")
+        print(f"✅ PDF جاهز بعدد {settings.copies} ملصقات")
         return FileResponse(file_path, media_type="application/pdf", filename="labels.pdf")
 
     except Exception as e:
