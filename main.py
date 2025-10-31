@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -7,7 +7,6 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 import os
-import shutil
 
 app = FastAPI()
 
@@ -24,33 +23,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ نموذج الإعدادات القادمة من الواجهة
+
+# ✅ نموذج البيانات القادمة من الواجهة
 class LabelSettings(BaseModel):
     perfume_name: str
     shop_name: str
     price: str | None = ""
     multiplier: str | None = ""
     copies: int = 1
-    label_width: float = 113.39  # الافتراضي 4 سم
+    label_width: float = 113.39  # افتراضي: 4 سم
     label_height: float = 113.39
-    logo_width: float = 30.0
-    logo_height: float = 30.0
     font_perfume: int = 10
     font_shop: int = 8
     font_price: int = 9
+    font_family_perfume: str = "Helvetica-Bold"
+    font_family_shop: str = "Times-Italic"
     extra_fields: list[dict] | None = None
-    font_perfume_family: str = "Helvetica-Bold"
-    font_shop_family: str = "Times-Italic"
-
-
-
-@app.post("/upload_logo")
-async def upload_logo(file: UploadFile = File(...)):
-    """🔹 لتحميل شعار جديد من الواجهة"""
-    file_path = "logo.png"
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"message": "✅ تم تحديث اللوجو بنجاح"}
 
 
 @app.post("/generate_label")
@@ -70,34 +58,49 @@ def generate_label(settings: LabelSettings):
         rows = int((page_height - margin) // settings.label_height)
 
         def draw_label(x, y):
-            # الإطار
-            c.setFont(settings.font_perfume_family, settings.font_perfume)
-            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 + 10, settings.perfume_name)
+            # ✅ الإطار الخارجي للملصق
+            c.setLineWidth(1)
+            c.setStrokeColor(colors.black)
+            c.roundRect(
+                x + 3, y + 3,
+                settings.label_width - 6,
+                settings.label_height - 6,
+                8, stroke=1, fill=0
+            )
 
-            c.setFont(settings.font_shop_family, settings.font_shop)
-            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 - 5, settings.shop_name)
-
-
-            # اللوجو
+            # ✅ اللوجو في الأعلى (يمكن التحكم فيه لاحقاً)
             if logo:
                 c.drawImage(
                     logo,
-                    x + (settings.label_width - settings.logo_width) / 2,
-                    y + settings.label_height - (settings.logo_height + 10),
-                    settings.logo_width,
-                    settings.logo_height,
+                    x + (settings.label_width - 30) / 2,
+                    y + settings.label_height - 40,
+                    30, 30,
                     mask="auto"
                 )
 
-            # اسم العطر
-            c.setFont("Helvetica-Bold", settings.font_perfume)
-            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 + 10, settings.perfume_name)
+            # ✅ اسم العطر
+            try:
+                c.setFont(settings.font_family_perfume, settings.font_perfume)
+            except:
+                c.setFont("Helvetica-Bold", settings.font_perfume)
+            c.drawCentredString(
+                x + settings.label_width / 2,
+                y + settings.label_height / 2 + 10,
+                settings.perfume_name
+            )
 
-            # اسم المحل
-            c.setFont("Times-Italic", settings.font_shop)
-            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 - 5, settings.shop_name)
+            # ✅ اسم المحل
+            try:
+                c.setFont(settings.font_family_shop, settings.font_shop)
+            except:
+                c.setFont("Times-Italic", settings.font_shop)
+            c.drawCentredString(
+                x + settings.label_width / 2,
+                y + settings.label_height / 2 - 5,
+                settings.shop_name
+            )
 
-            # السعر والضرب
+            # ✅ السعر والضرب
             if settings.price or settings.multiplier:
                 c.setFont("Helvetica-Bold", settings.font_price)
                 text = ""
@@ -105,18 +108,26 @@ def generate_label(settings: LabelSettings):
                     text += f"DA {settings.price} "
                 if settings.multiplier:
                     text += f"({settings.multiplier})"
-                c.drawCentredString(x + settings.label_width / 2, y + 20, text.strip())
+                c.drawCentredString(
+                    x + settings.label_width / 2,
+                    y + 20,
+                    text.strip()
+                )
 
-            # الحقول الإضافية
+            # ✅ الحقول الإضافية
             if settings.extra_fields:
                 c.setFont("Helvetica", 7)
                 y_offset = 10
                 for field in settings.extra_fields:
                     label_text = f"{field['label']}: {field['value']}"
-                    c.drawCentredString(x + settings.label_width / 2, y + y_offset, label_text)
+                    c.drawCentredString(
+                        x + settings.label_width / 2,
+                        y + y_offset,
+                        label_text
+                    )
                     y_offset -= 10
 
-        # رسم كل الملصقات
+        # ✅ رسم عدد الملصقات حسب المطلوب
         count = 0
         for row in range(rows):
             for col in range(cols):
@@ -130,7 +141,7 @@ def generate_label(settings: LabelSettings):
                 break
 
         c.save()
-        print(f"✅ PDF جاهز بعدد {settings.copies} ملصقات (مقاس {settings.label_width}x{settings.label_height})")
+        print(f"✅ PDF جاهز بعدد {settings.copies} ملصقات")
         return FileResponse(file_path, media_type="application/pdf", filename="labels.pdf")
 
     except Exception as e:
