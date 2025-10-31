@@ -39,6 +39,9 @@ class LabelSettings(BaseModel):
     font_shop: int = 8
     font_price: int = 9
     extra_fields: list[dict] | None = None
+    font_perfume_family: str = "Helvetica-Bold"
+    font_shop_family: str = "Times-Italic"
+
 
 
 @app.post("/upload_logo")
@@ -68,9 +71,12 @@ def generate_label(settings: LabelSettings):
 
         def draw_label(x, y):
             # الإطار
-            c.setLineWidth(1)
-            c.setStrokeColor(colors.black)
-            c.roundRect(x + 3, y + 3, settings.label_width - 6, settings.label_height - 6, 8, stroke=1, fill=0)
+            c.setFont(settings.font_perfume_family, settings.font_perfume)
+            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 + 10, settings.perfume_name)
+
+            c.setFont(settings.font_shop_family, settings.font_shop)
+            c.drawCentredString(x + settings.label_width / 2, y + settings.label_height / 2 - 5, settings.shop_name)
+
 
             # اللوجو
             if logo:
