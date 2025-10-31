@@ -14,11 +14,11 @@ import os, shutil, math
 
 app = FastAPI()
 
-# ===== CORS =====
+# ===== CORS - عدل النطاقات حسب مكان نشر الواجهة =====
 origins = [
     "http://localhost:5173",
     "https://perfume-label-frontend.vercel.app",
-    # أضف هنا رابط الواجهة المنشورة إن لزم
+    # أضف هنا رابط الواجهة المنشور (مثلاً Vercel) إن لزم
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -28,223 +28,225 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===== helpers =====
-MM_TO_PT = 2.83465  # 1 mm ≈ 2.83465 points
+# ===== ثابت التحويل mm -> points (ReportLab uses points) =====
+MM_TO_PT = 2.83465
 
 def mm_to_pt(mm: float) -> float:
     return float(mm) * MM_TO_PT
 
-# register arabic font if provided
+# ===== مسارات الملفات الثابتة =====
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-AMIRI_PATH = os.path.join(BASE_DIR, "Amiri-Regular.ttf")
-if os.path.exists(AMIRI_PATH):
-    try:
-        pdfmetrics.registerFont(TTFont("Amiri", AMIRI_PATH))
-        ARABIC_FONT_AVAILABLE = True
-    except Exception as e:
-        print("Could not register Amiri:", e)
-        ARABIC_FONT_AVAILABLE = False
-else:
-    ARABIC_FONT_AVAILABLE = False
+OUT_PDF = os.path.join(BASE_DIR, "labels.pdf")
+LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
+AMIRI_TTF = os.path.join(BASE_DIR, "Amiri-Regular.ttf")  # ضع هذا الملف إن أردت دعم عربي جميل
 
-# ===== API for upload logo =====
-@app.post("/upload_logo")
-async def upload_logo(file: UploadFile = File(...)):
+# تسجيل خط Amiri إن وجد
+ARABIC_FONT = None
+if os.path.exists(AMIRI_TTF):
     try:
-        logo_path = os.path.join(BASE_DIR, "logo.png")
-        with open(logo_path, "wb") as out:
-            shutil.copyfileobj(file.file, out)
-        return {"message": "Logo uploaded"}
+        pdfmetrics.registerFont(TTFont("Amiri", AMIRI_TTF))
+        ARABIC_FONT = "Amiri"
+        print("✅ Amiri font registered.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print("⚠️ Failed to register Amiri:", e)
 
-# ===== Data models =====
+# ===== نماذج البيانات المتوقعة من الواجهة =====
 class TemplateItem(BaseModel):
-    perfume_name: str
+    perfumeName: str
     price: Optional[str] = ""
     multiplier: Optional[str] = ""
-    shop_name: Optional[str] = None  # if None, use settings.shop_name
-    # validation helpers
+    shopName: Optional[str] = None
+    # يمكنك لاحقًا إضافة extra_fields لكل قالب
+
     @validator("price")
-    def price_digits(cls, v):
-        if v is None or v == "":
+    def price_must_be_digits(cls, v):
+        if not v or v == "":
             return v
-        # allow numbers only (optionally with spaces or commas)
         cleaned = v.replace(" ", "").replace(",", "")
         if not cleaned.isdigit():
             raise ValueError("price must contain digits only")
         return v
 
     @validator("multiplier")
-    def multiplier_digits(cls, v):
-        if v is None or v == "":
+    def multiplier_must_be_digits(cls, v):
+        if not v or v == "":
             return v
         cleaned = v.replace(" ", "").replace("×", "").replace("x", "")
         if not cleaned.isdigit():
             raise ValueError("multiplier must contain digits only")
         return v
 
-class LabelSettings(BaseModel):
-    shop_name: str
+class FontSettings(BaseModel):
+    perfumeFont: Optional[str] = "Helvetica-Bold"
+    perfumeSize: int = 12
+    shopFont: Optional[str] = "Times-Italic"
+    shopSize: int = 10
+    priceFont: Optional[str] = "Helvetica-Bold"
+    priceSize: int = 9
+    quantityFont: Optional[str] = "Helvetica"
+    quantitySize: int = 9
+
+class GenerateRequest(BaseModel):
+    perfumeName: Optional[str] = None        # عام (يمكن تجاوزه بقالب)
+    shopName: Optional[str] = None
+    price: Optional[str] = ""
+    quantity: Optional[str] = ""
     copies: int = Field(1, ge=1, le=35)
-    label_width_mm: float = Field(40.0, gt=0)   # mm
-    label_height_mm: float = Field(40.0, gt=0)  # mm
-    radius_mm: float = Field(2.0, ge=0)  # corner radius in mm
-    font_perfume_name: str = "Helvetica-Bold"
-    font_shop_name: str = "Times-Italic"
-    font_perfume_size: int = 12
-    font_shop_size: int = 10
-    font_price_size: int = 9
+    labelWidth: float = Field(40.0, gt=0)    # بالـ mm من الواجهة
+    labelHeight: float = Field(40.0, gt=0)
+    borderRadius: float = Field(2.0, ge=0)  # بالـ mm
+    fontSettings: Optional[FontSettings] = FontSettings()
     templates: Optional[List[TemplateItem]] = None
 
-    @validator("label_width_mm")
-    def width_within_page(cls, v):
-        # ensure at least one column fits in A4 width with margin
-        page_w_pt, page_h_pt = A4
-        max_width_mm = page_w_pt / MM_TO_PT
-        if v > max_width_mm:
-            raise ValueError(f"label width too large for A4 (max {max_width_mm:.1f} mm)")
+    @validator("labelWidth")
+    def width_fits_a4(cls, v):
+        page_w_mm = A4[0] / MM_TO_PT
+        if v > page_w_mm:
+            raise ValueError(f"label width must be <= page width ({page_w_mm:.1f} mm)")
         return v
 
-    @validator("label_height_mm")
-    def height_within_page(cls, v):
-        page_w_pt, page_h_pt = A4
-        max_height_mm = page_h_pt / MM_TO_PT
-        if v > max_height_mm:
-            raise ValueError(f"label height too large for A4 (max {max_height_mm:.1f} mm)")
+    @validator("labelHeight")
+    def height_fits_a4(cls, v):
+        page_h_mm = A4[1] / MM_TO_PT
+        if v > page_h_mm:
+            raise ValueError(f"label height must be <= page height ({page_h_mm:.1f} mm)")
         return v
 
-# ===== PDF generation =====
-@app.post("/generate_label")
-def generate_label(settings: LabelSettings):
+# ===== endpoint لرفع لوجو جديد (logo.png سيُستخدم تلقائياً) =====
+@app.post("/upload_logo")
+async def upload_logo(file: UploadFile = File(...)):
     try:
-        # compute label sizes in points
-        label_w_pt = mm_to_pt(settings.label_width_mm)
-        label_h_pt = mm_to_pt(settings.label_height_mm)
-        radius_pt = mm_to_pt(settings.radius_mm)
+        with open(LOGO_PATH, "wb") as out:
+            shutil.copyfileobj(file.file, out)
+        return {"message": "Logo uploaded"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ===== توليد PDF =====
+@app.post("/generate_label")
+def generate_label(req: GenerateRequest):
+    try:
+        # تحقق من وجود قوالب
+        if not req.templates or len(req.templates) == 0:
+            raise HTTPException(status_code=400, detail="templates list is required and must contain at least one item")
+
+        # حساب الوحدات بالـ points
+        label_w_pt = mm_to_pt(req.labelWidth)
+        label_h_pt = mm_to_pt(req.labelHeight)
+        radius_pt = mm_to_pt(req.borderRadius)
 
         page_w_pt, page_h_pt = A4
-        margin = 10  # points
+        margin = 10  # نقطة كهوامش ثابتة
 
-        # check how many columns/rows fit
+        # حساب الأعمدة/الصفوف الممكنة على صفحة A4
         cols = max(1, int((page_w_pt - margin) // label_w_pt))
         rows = max(1, int((page_h_pt - margin) // label_h_pt))
-        max_labels = cols * rows
-        # debug
-        # print("cols,rows,max_labels", cols, rows, max_labels)
+        max_labels_per_page = cols * rows
 
-        # prepare templates list:
-        templates = settings.templates or []
-        if not templates:
-            raise HTTPException(status_code=400, detail="No templates provided")
-
-        # flatten the desired labels list:
-        labels_list = []
-        # if templates length >= copies, use first copies templates
-        # else repeat templates cyclically until copies reached
+        # تجهيز قائمة الملصقات (templates) بحيث تُكرَّر حتى يصل العدد المطلوب copies
+        desired = []
         idx = 0
-        while len(labels_list) < settings.copies:
-            item = templates[idx % len(templates)]
-            labels_list.append(item)
+        while len(desired) < req.copies:
+            tpl = req.templates[idx % len(req.templates)]
+            desired.append(tpl)
             idx += 1
 
-        # enforce max_labels
-        to_generate = min(len(labels_list), max_labels)
+        # نقطع إلى ما يمكن وضعه على صفحة واحدة (يمكن لاحقًا إضافة صفحات متعددة)
+        to_generate = min(len(desired), max_labels_per_page)
 
-        # prepare logo if exists
-        logo_path = os.path.join(BASE_DIR, "logo.png")
-        logo = ImageReader(logo_path) if os.path.exists(logo_path) else None
+        # تحميل اللوجو إن وُجد
+        logo = ImageReader(LOGO_PATH) if os.path.exists(LOGO_PATH) else None
 
-        # create canvas
-        out_path = os.path.join(BASE_DIR, "labels.pdf")
-        c = canvas.Canvas(out_path, pagesize=A4)
+        # إنشاء canvas
+        c = canvas.Canvas(OUT_PDF, pagesize=A4)
 
-        # choose fonts fallback: if Arabic font available, register mapping as "Amiri"
-        arabic_font = "Amiri" if ARABIC_FONT_AVAILABLE else None
-
-        def draw_one(x, y, tpl: TemplateItem):
-            # outer rounded rect
-            c.setLineWidth(0.8)
-            c.setStrokeColor(colors.black)
-            # use radius_pt; reportlab expects radius as float
-            c.roundRect(x + 3, y + 3, label_w_pt - 6, label_h_pt - 6, radius_pt, stroke=1, fill=0)
-
-            # logo centered top
-            if logo:
-                # calculate logo size to fit (proportional) - optional
-                # here we place it using fraction of label height
-                logo_w = min(label_w_pt * 0.5, label_w_pt * 0.3)
-                logo_h = logo_w
-                c.drawImage(logo, x + (label_w_pt - logo_w) / 2, y + label_h_pt - logo_h - 8, logo_w, logo_h, mask='auto')
-
-            # perfume name
-            # choose font name (if user provided an arabic font choice, you could map)
-            font_perf_name = settings.font_perfume_name
-            try:
-                c.setFont(font_perf_name, settings.font_perfume_size)
-            except:
-                if arabic_font and contains_arabic(tpl.perfume_name):
-                    c.setFont(arabic_font, settings.font_perfume_size)
-                else:
-                    c.setFont("Helvetica-Bold", settings.font_perfume_size)
-
-            c.drawCentredString(x + label_w_pt / 2, y + label_h_pt / 2 + settings.font_perfume_size/2 + 6, tpl.perfume_name)
-
-            # shop name (use template shop_name if given else settings.shop_name)
-            shop_text = tpl.shop_name if (tpl.shop_name and tpl.shop_name.strip()) else settings.shop_name
-            try:
-                c.setFont(settings.font_shop_name, settings.font_shop_size)
-            except:
-                if arabic_font and contains_arabic(shop_text):
-                    c.setFont(arabic_font, settings.font_shop_size)
-                else:
-                    c.setFont("Times-Italic", settings.font_shop_size)
-
-            c.drawCentredString(x + label_w_pt / 2, y + label_h_pt / 2 - settings.font_shop_size/2 - 2, shop_text)
-
-            # price and multiplier (ensure numeric)
-            if tpl.price or tpl.multiplier:
-                price_txt = ""
-                if tpl.price:
-                    # sanitize digits
-                    cleaned = tpl.price.replace(" ", "").replace(",", "")
-                    price_txt += f"{cleaned} د.ج"
-                if tpl.multiplier:
-                    cleaned_m = tpl.multiplier.replace(" ", "").replace("×", "").replace("x", "")
-                    price_txt += f" (×{cleaned_m})"
-                c.setFont("Helvetica-Bold", settings.font_price_size)
-                c.drawCentredString(x + label_w_pt / 2, y + 18, price_txt)
-
-            # extra fields bottom
-            if tpl and hasattr(tpl, "extra_fields") and tpl.extra_fields:
-                c.setFont("Helvetica", 7)
-                y_off = 10
-                for f in tpl.extra_fields:
-                    txt = f"{f.get('label','')}: {f.get('value','')}"
-                    c.drawCentredString(x + label_w_pt / 2, y + y_off, txt)
-                    y_off += 9
-
-        # helper to detect Arabic (very simple)
+        # دالة دعم اكتشاف العربية (مبسيط)
         def contains_arabic(s: str) -> bool:
+            if not s:
+                return False
             for ch in s:
                 if "\u0600" <= ch <= "\u06FF" or "\u0750" <= ch <= "\u077F":
                     return True
             return False
 
-        # draw labels row-major
+        # رسم ملصق واحد
+        def draw_label(x, y, tpl: TemplateItem):
+            # إطار خارجي بزوايا دائرية (radius_pt)
+            c.setLineWidth(0.9)
+            c.setStrokeColor(colors.black)
+            c.roundRect(x + 3, y + 3, label_w_pt - 6, label_h_pt - 6, radius_pt, stroke=1, fill=0)
+
+            # رسم اللوجو مركزًا في الأعلى (إن وُجد)
+            if logo:
+                # نضع اللوجو بأقصى عرض 40% من الملصق أو 30 نقطة (قيمة افتراضية يمكن تطويرها)
+                logo_w = min(label_w_pt * 0.45, 60)
+                logo_h = logo_w
+                c.drawImage(logo, x + (label_w_pt - logo_w) / 2, y + label_h_pt - logo_h - 8, logo_w, logo_h, mask='auto')
+
+            # اسم العطر (من القالب أولاً ثم من العام)
+            pname = tpl.perfumeName if tpl.perfumeName else (req.perfumeName or "")
+            # اختيار الخط المناسب (إن كان عربي استخدم Amiri إن متاح)
+            fs = req.fontSettings or FontSettings()
+            try:
+                if contains_arabic(pname) and ARABIC_FONT:
+                    c.setFont(ARABIC_FONT, fs.perfumeSize)
+                else:
+                    c.setFont(fs.perfumeFont or "Helvetica-Bold", fs.perfumeSize)
+            except Exception:
+                c.setFont("Helvetica-Bold", fs.perfumeSize)
+            c.drawCentredString(x + label_w_pt / 2, y + label_h_pt / 2 + fs.perfumeSize/1.5 + 6, pname)
+
+            # اسم المحل (template يمكن أن يحتوي shopName)
+            shop_text = tpl.shopName if tpl.shopName else (req.shopName or "")
+            try:
+                if contains_arabic(shop_text) and ARABIC_FONT:
+                    c.setFont(ARABIC_FONT, fs.shopSize)
+                else:
+                    c.setFont(fs.shopFont or "Times-Italic", fs.shopSize)
+            except Exception:
+                c.setFont("Times-Italic", fs.shopSize)
+            c.drawCentredString(x + label_w_pt / 2, y + label_h_pt / 2 - fs.shopSize/1.5 - 2, shop_text)
+
+            # السعر والكمية
+            price_txt = ""
+            if tpl.price:
+                price_txt = f"{tpl.price} د.ج"
+            elif req.price:
+                price_txt = f"{req.price} د.ج"
+
+            mult_txt = ""
+            if tpl.multiplier:
+                mult_txt = tpl.multiplier
+            elif req.quantity:
+                mult_txt = req.quantity
+
+            if price_txt or mult_txt:
+                display = price_txt
+                if mult_txt:
+                    display += f"  ×{mult_txt}"
+                try:
+                    c.setFont(fs.priceFont or "Helvetica-Bold", fs.priceSize)
+                except:
+                    c.setFont("Helvetica-Bold", fs.priceSize)
+                c.drawCentredString(x + label_w_pt / 2, y + 18, display)
+
+        # رسم الملصقات بالترتيب (صف-عمود)
         count = 0
         for r in range(rows):
-            for cidx in range(cols):
+            for col in range(cols):
                 if count >= to_generate:
                     break
-                x = margin + cidx * label_w_pt
+                x = margin + col * label_w_pt
                 y = page_h_pt - margin - label_h_pt - r * label_h_pt
-                draw_one(x, y, labels_list[count])
+                draw_label(x, y, desired[count])
                 count += 1
             if count >= to_generate:
                 break
 
         c.save()
-        return FileResponse(out_path, media_type="application/pdf", filename="labels.pdf")
+        return FileResponse(OUT_PDF, media_type="application/pdf", filename="labels.pdf")
+
+    except HTTPException as he:
+        raise he
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
