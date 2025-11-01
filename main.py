@@ -14,47 +14,6 @@ import os, shutil, math
 
 app = FastAPI()
 
-# 🪄 دالة لتحويل snake_case إلى camelCase
-def to_camel(string: str) -> str:
-    parts = string.split('_')
-    return parts[0] + ''.join(word.capitalize() for word in parts[1:])
-
-# 🧩 نموذج فرعي يمثل كل عطر في القالب
-class TemplateItem(BaseModel):
-    perfume_name: str
-    price: float
-    multiplier: int
-    shop_name: str
-
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name = True
-
-# 🧱 النموذج الرئيسي
-class LabelRequest(BaseModel):
-    shop_name: str
-    copies: int
-    label_width_mm: float
-    label_height_mm: float
-    radius_mm: float
-    font_perfume_name: str
-    font_shop_name: str
-    font_perfume_size: int
-    font_shop_size: int
-    font_price_size: int
-    templates: List[TemplateItem]
-
-    class Config:
-        alias_generator = to_camel  # يسمح بقراءة camelCase تلقائياً
-        allow_population_by_field_name = True  # يسمح أيضاً باستخدام snake_case
-
-# ✅ endpoint
-@app.post("/generate_label")
-def generate_label(request: LabelRequest):
-    print("📦 بيانات مستلمة:", request.dict())
-    # هنا ضع منطق إنشاء الملصق ...
-    return {"message": "Label generated successfully"}
-
 # ===== CORS - عدل النطاقات حسب مكان نشر الواجهة =====
 origins = [
     "http://localhost:5173",
