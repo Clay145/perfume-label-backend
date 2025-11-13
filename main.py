@@ -328,6 +328,13 @@ def generate_label(req: GenerateRequest):
             c.setFillColorRGB(0.86, 0.84, 0.8)  # لون بيج فاتح لخفض حدة الذهبية هنا قليلاً
             c.drawCentredString(inner_x + inner_w / 2, deco_y - (fs.shopSize * 1.2), shop_text)
 
+            # خط زخرفي ذهبي صغير (فاصل) تحت اسم المحل
+            deco_y = name_y - (name_size * 0.8)
+            c.setLineWidth(1)
+            c.setStrokeColorRGB(*GOLD)
+            line_w = inner_w * 0.4
+            c.line(inner_x + (inner_w - line_w) / 2, deco_y, inner_x + (inner_w + line_w) / 2, deco_y)
+
             # أسفل: السعر، الكمية، رقم الهاتف (محاذاة مركزية أو صفّية)
             price_txt = tpl.price or req.price or ""
             mult_txt = tpl.multiplier or "" or req.quantity or ""
