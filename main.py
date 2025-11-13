@@ -10,6 +10,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import stringWidth
 import os, shutil, math
 
 app = FastAPI()
@@ -250,6 +251,14 @@ def generate_label(req: GenerateRequest):
                 if "\u0600" <= ch <= "\u06FF" or "\u0750" <= ch <= "\u077F":
                     return True
             return False
+        
+        def fit_text(c, text, font_name, max_width, font_size, min_size=6):
+            """
+            يحاول تصغير الخط حتى يتناسب النص مع العرض المحدد.
+            """
+            while stringWidth(text, font_name, font_size) > max_width and font_size > min_size:
+              font_size -= 0.5
+            return font_size
 
         # دالة رسم الملصق الفاخر
         def draw_label(x, y, tpl):
@@ -362,17 +371,23 @@ def generate_label(req: GenerateRequest):
                 c.drawString(inner_x + inner_w/2 + 30, bottom_y + (fs.priceSize * 0.6), qty_display)
 
             # إذا وُجدت إضافات، اطبعها تحت اسم المحل بخط صغير
+            # --- قسم المعلومات الإضافية أسفل اسم المحل ---
             extra = tpl.extraInfo or ""
             if extra:
-                extra_font = "Amiri" if contains_arabic(extra) and "Amiri" in pdfmetrics.getRegisteredFontNames() else (fs.shopFont or "Times-Italic")
-                extra_size = max(7, int(fs.shopSize * 0.85))
-                try:
-                    c.setFont(extra_font, extra_size)
-                except Exception:
-                    c.setFont("Times-Italic", extra_size)
-                c.setFillColorRGB(0.86, 0.84, 0.8)
-                c.drawCentredString(inner_x + inner_w / 2, deco_y - (fs.shopSize * 1.2) - (extra_size * 1.1), extra)
+             extra_font = "Amiri" if contains_arabic(extra) and "Amiri" in pdfmetrics.getRegisteredFontNames() else (fs.shopFont or "Times-Italic")
+             extra_size = max(7, int(fs.shopSize * 0.85))
+             c.setFont(extra_font, extra_size)
+             c.setFillColorRGB(0.9, 0.88, 0.82)
 
+             # اجعلها في قسم منفصل أسفل منتصف الملصق
+             extra_y = inner_y + inner_h * 0.20
+             c.drawCentredString(inner_x + inner_w / 2, extra_y, extra)
+
+             # خط زخرفي صغير تحته
+             c.setStrokeColorRGB(*GOLD)
+             c.setLineWidth(0.6)
+             line_w = inner_w * 0.3
+             c.line(inner_x + (inner_w - line_w) / 2, extra_y - 4, inner_x + (inner_w + line_w) / 2, extra_y - 4)
 
             # رقم الهاتف (إذا وُجد في extra field أو shopName—يمكن إضافة حقل لاحقاً)
             # إذا أردت استخدام حقل إضافي، أضفه ك tpl.extra.phone أو req.extra_phone
