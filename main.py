@@ -11,15 +11,17 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.pdfmetrics import stringWidth
-import os, shutil, math
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+import os, shutil, math, traceback
 
 app = FastAPI()
 
-# ===== CORS - عدل النطاقات حسب مكان نشر الواجهة =====
+# ===== CORS =====
 origins = [
     "http://localhost:5173",
     "https://perfume-label-frontend.vercel.app",
-    # أضف هنا رابط الواجهة المنشور (مثلاً Vercel) إن لزم
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -29,19 +31,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ===== ثابت التحويل mm -> points (ReportLab uses points) =====
 MM_TO_PT = 2.83465
 
 def mm_to_pt(mm: float) -> float:
     return float(mm) * MM_TO_PT
 
-# ===== مسارات الملفات الثابتة =====
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT_PDF = os.path.join(BASE_DIR, "labels.pdf")
 LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
-AMIRI_TTF = os.path.join(BASE_DIR, "Amiri-Regular.ttf")  # ضع هذا الملف إن أردت دعم عربي جميل
+AMIRI_TTF = os.path.join(BASE_DIR, "Amiri-Regular.ttf")
 
-# تسجيل خط Amiri إن وجد
 ARABIC_FONT = None
 if os.path.exists(AMIRI_TTF):
     try:
@@ -51,14 +50,13 @@ if os.path.exists(AMIRI_TTF):
     except Exception as e:
         print("⚠️ Failed to register Amiri:", e)
 
-# ===== نماذج البيانات (Models) =====
-
 class TemplateItem(BaseModel):
     perfumeName: Optional[str] = ""
     price: Optional[str] = ""
     multiplier: Optional[str] = ""
     shopName: Optional[str] = ""
     extraInfo: Optional[str] = ""
+    phone: Optional[str] = None
 
     @field_validator("price")
     @classmethod
@@ -90,12 +88,16 @@ class FontSettings(BaseModel):
     priceSize: int = 9
     quantityFont: Optional[str] = "Helvetica"
     quantitySize: int = 9
+    extraInfoSize: int = 9
 
 class StyleSettings(BaseModel):
     theme: Optional[str] = "gold_black"
-    primaryColor: Optional[str] = "#D4AF37"  # hex string
+    primaryColor: Optional[str] = "#D4AF37"
     accentColor: Optional[str] = "#080808"
+    extraInfoColor: Optional[str] = "#E5E0D1"
     borderColor: Optional[str] = None
+    shopNameColor: Optional[str] = "#C5C0B0"
+    quantityColor: Optional[str] = "#C5C0B0"
 
 class GenerateRequest(BaseModel):
     shopName: Optional[str] = ""
@@ -114,7 +116,6 @@ class GenerateRequest(BaseModel):
     @field_validator("borderRadius", mode="before")
     @classmethod
     def parse_radius(cls, v):
-        # يحول أي قيمة نصية إلى float تلقائيًا
         try:
             return float(v)
         except:
@@ -138,7 +139,6 @@ class GenerateRequest(BaseModel):
             raise ValueError(f"label height must be <= page height ({page_h_mm:.1f} mm)")
         return v
 
-# ===== endpoint لرفع لوجو جديد (logo.png سيُستخدم تلقائياً) =====
 @app.post("/upload_logo")
 async def upload_logo(file: UploadFile = File(...)):
     try:
@@ -149,7 +149,6 @@ async def upload_logo(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi import status
 from fastapi.encoders import jsonable_encoder
 
@@ -162,28 +161,23 @@ async def validation_exception_handler(request, exc):
         content={"detail": jsonable_encoder(exc.errors())},
     )
 
-# --- Start replacement generate_label (paste into main.py, استبدل الدالة الموجودة) ---
 @app.post("/generate_label")
 def generate_label(req: GenerateRequest):
     try:
-        # تحقق من وجود قوالب
         if not req.templates or len(req.templates) == 0:
             raise HTTPException(status_code=400, detail="templates list is required and must contain at least one item")
 
-        # تحويل الوحدات (MM -> points)
         label_w_pt = mm_to_pt(req.labelWidth)
         label_h_pt = mm_to_pt(req.labelHeight)
         radius_pt = mm_to_pt(req.borderRadius)
 
         page_w_pt, page_h_pt = A4
-        margin = mm_to_pt(6)  # هامش ثابت صغير بالـ points
+        margin = mm_to_pt(6)
 
-        # حساب الأعمدة/الصفوف الممكنة على صفحة A4
         cols = max(1, int((page_w_pt - margin) // label_w_pt))
         rows = max(1, int((page_h_pt - margin) // label_h_pt))
         max_labels_per_page = cols * rows
 
-        # بناء قائمة الملصقات المطلوبة (نكرر القوالب حتى نصل للـ copies)
         desired = []
         idx = 0
         while len(desired) < req.copies:
@@ -193,25 +187,21 @@ def generate_label(req: GenerateRequest):
 
         to_generate = min(len(desired), max_labels_per_page)
 
-        # اقرأ الألوان من req.style
-        # ✅ اقرأ ألوان المستخدم من الـ frontend (أو استخدم القيم الافتراضية)
-        primary_hex = (req.style.primaryColor or "#D4AF37").lstrip("#")  # النصوص / الإطار
-        accent_hex = (req.style.accentColor or "#080808").lstrip("#")    # الخلفية
-        # ✅ حولها إلى RGB في نطاق 0..1
+        primary_hex = (req.style.primaryColor or "#D4AF37").lstrip("#")
+        accent_hex = (req.style.accentColor or "#080808").lstrip("#")
         primary_rgb = tuple(int(primary_hex[i:i+2], 16) / 255 for i in (0, 2, 4))
         accent_rgb = tuple(int(accent_hex[i:i+2], 16) / 255 for i in (0, 2, 4))
 
-        border_hex = (req.style.borderColor or req.style.primaryColor or "#D4AF37").lstrip("#")
-        border_rgb = tuple(int(border_hex[i:i+2], 16)/255 for i in (0,2,4))
+        extra_hex = (req.style.extraInfoColor or "#E5E0D1").lstrip("#")
+        extra_rgb = tuple(int(extra_hex[i:i+2], 16) / 255 for i in (0, 2, 4))
 
+        # New colors for shop name and quantity
+        shop_hex = (req.style.shopNameColor or "#C5C0B0").lstrip("#")
+        shop_rgb = tuple(int(shop_hex[i:i+2], 16) / 255 for i in (0, 2, 4))
 
-        # تحويل hex إلى أرقام RGB 0..1
-        r = int(primary_hex[0:2], 16)/255
-        g = int(primary_hex[2:4], 16)/255
-        b = int(primary_hex[4:6], 16)/255
-        # ثم استخدم c.setFillColorRGB(r,g,b) عند رسم النص بدل القيم الثابتة للذهب
+        quantity_hex = (req.style.quantityColor or "#C5C0B0").lstrip("#")
+        quantity_rgb = tuple(int(quantity_hex[i:i+2], 16) / 255 for i in (0, 2, 4))
 
-        # تسجيل خطوط فخمة إن وُجدت (ضع ملفات TTF في مجلد fonts/)
         def try_register(name, path):
             if os.path.exists(path):
                 try:
@@ -221,29 +211,21 @@ def generate_label(req: GenerateRequest):
                     print("⚠️ font register failed:", path, e)
             return None
 
-        # أمثلة خطوط (ضع الملفات في مجلد fonts/)
         fonts_dir = os.path.join(BASE_DIR, "fonts")
-        PLAYFAIR = try_register("Playfair", os.path.join(fonts_dir, "PlayfairDisplay-Bold.ttf"))  # إن أردت
+        PLAYFAIR = try_register("Playfair", os.path.join(fonts_dir, "PlayfairDisplay-Bold.ttf"))
         CINZEL = try_register("Cinzel", os.path.join(fonts_dir, "CinzelDecorative-Regular.ttf"))
         if os.path.exists(AMIRI_TTF):
             try:
                 pdfmetrics.registerFont(TTFont("Amiri", AMIRI_TTF))
-                # ARABIC_FONT already set earlier
             except Exception as e:
                 print("⚠️ Amiri register failed:", e)
 
-        # ألوان افتراضية (يمكن استقبالها من payload لاحقًا)
-        GOLD = primary_rgb     # اللون الأساسي (للنصوص والإطار)
-        DARK = accent_rgb      # لون الخلفية
+        GOLD = primary_rgb
+        DARK = accent_rgb
 
-
-        # تحميل اللوجو إن وُجد
         logo = ImageReader(LOGO_PATH) if os.path.exists(LOGO_PATH) else None
-
-        # أنشئ الـ canvas
         c = canvas.Canvas(OUT_PDF, pagesize=A4)
 
-        # دالة مساعدة لاكتشاف العربية
         def contains_arabic(s: str) -> bool:
             if not s:
                 return False
@@ -251,38 +233,23 @@ def generate_label(req: GenerateRequest):
                 if "\u0600" <= ch <= "\u06FF" or "\u0750" <= ch <= "\u077F":
                     return True
             return False
-        
-        def fit_text(c, text, font_name, max_width, font_size, min_size=6):
-            """
-            يحاول تصغير الخط حتى يتناسب النص مع العرض المحدد.
-            """
-            while stringWidth(text, font_name, font_size) > max_width and font_size > min_size:
-              font_size -= 0.5
-            return font_size
 
-        # دالة رسم الملصق الفاخر
         def draw_label(x, y, tpl):
-            # صندوق داخلي ملون (خلفية داكنة داخل الإطار)
-            padding = 8  # نقاط
+            padding = 8
             inner_x = x + 3
             inner_y = y + 3
             inner_w = label_w_pt - 6
             inner_h = label_h_pt - 6
 
-            # خلفية داكنة
-            # خلفية قابلة للتخصيص
             c.setFillColorRGB(*DARK)
             c.roundRect(inner_x, inner_y, inner_w, inner_h, radius_pt, stroke=0, fill=1)
 
-            # إطار باللون الذي اختاره المستخدم
             c.setLineWidth(1.2)
             c.setStrokeColorRGB(*GOLD)
             c.roundRect(inner_x + 1, inner_y + 1, inner_w - 2, inner_h - 2, radius_pt, stroke=1, fill=0)
 
-            # منطقة اللوجو العلوية (مركزي)
             logo_area_h = inner_h * 0.22
             if logo:
-                # ضع اللوجو بحجم نسبي داخل الدائرة
                 max_logo_w = inner_w * 0.4
                 max_logo_h = logo_area_h - 6
                 logo_w = min(max_logo_w, max_logo_h)
@@ -294,62 +261,51 @@ def generate_label(req: GenerateRequest):
                 except Exception as e:
                     print("⚠️ drawImage failed:", e)
 
-            # إعداد الخطوط (اختر الأولية من fontSettings أو تعليق بديل)
             fs = req.fontSettings or FontSettings()
 
-            # اسم العطر — بمساحة كبيرة ومركزية
             pname = tpl.perfumeName or ""
-            name_font = None
             if contains_arabic(pname) and "Amiri" in pdfmetrics.getRegisteredFontNames():
                 name_font = "Amiri"
-            elif PLAYFAIR:
-                name_font = PLAYFAIR
-            elif CINZEL:
-                name_font = CINZEL
             else:
-                name_font = fs.perfumeFont or "Helvetica-Bold"
+                name_font = "Helvetica-Bold"
 
             name_size = fs.perfumeSize if getattr(fs, "perfumeSize", None) else max(12, int(min(inner_w, inner_h) * 0.12))
-            try:
-                c.setFont(name_font, name_size)
-            except Exception:
-                c.setFont("Helvetica-Bold", name_size)
+            
+            p_style = ParagraphStyle(
+                name='PerfumeName',
+                fontName=name_font,
+                fontSize=name_size,
+                leading=name_size * 1.1,
+                alignment=TA_CENTER,
+                textColor=colors.Color(*GOLD)
+            )
+            p_text = pname.replace('\n', '<br/>')
+            p = Paragraph(p_text, p_style)
+            p_w, p_h = p.wrap(inner_w, inner_h * 0.4)
+            
+            name_y_center = inner_y + inner_h * 0.56
+            p.drawOn(c, inner_x, name_y_center - p_h / 2)
 
-            c.setFillColorRGB(*GOLD)
-            # احسب موضع الاسم مع مراعاة المساحة العلوية
-            name_y = inner_y + inner_h * 0.56
-            c.drawCentredString(inner_x + inner_w / 2, name_y, pname)
-
-            # خط زخرفي ذهبي صغير (فاصل) تحت الاسم
-            deco_y = name_y - (name_size * 0.8)
+            deco_y = (name_y_center - p_h / 2) - (name_size * 0.4)
             c.setLineWidth(1)
             c.setStrokeColorRGB(*GOLD)
             line_w = inner_w * 0.4
             c.line(inner_x + (inner_w - line_w) / 2, deco_y, inner_x + (inner_w + line_w) / 2, deco_y)
 
-            # اسم المحل تحت الفاصل (أصغر حجماً)
+            # Shop name with custom color
             shop_text = tpl.shopName or req.shopName or ""
             shop_font = "Amiri" if contains_arabic(shop_text) and "Amiri" in pdfmetrics.getRegisteredFontNames() else (fs.shopFont or "Times-Italic")
             try:
                 c.setFont(shop_font, fs.shopSize)
             except Exception:
                 c.setFont("Times-Italic", fs.shopSize)
-            c.setFillColorRGB(0.86, 0.84, 0.8)  # لون بيج فاتح لخفض حدة الذهبية هنا قليلاً
+            c.setFillColorRGB(*shop_rgb)  # Use custom shop name color
             c.drawCentredString(inner_x + inner_w / 2, deco_y - (fs.shopSize * 1.2), shop_text)
 
-            # خط زخرفي ذهبي صغير (فاصل) تحت اسم المحل
-            deco_y = name_y - (name_size * 0.8)
-            c.setLineWidth(1)
-            c.setStrokeColorRGB(*GOLD)
-            line_w = inner_w * 0.4
-            c.line(inner_x + (inner_w - line_w) / 2, deco_y, inner_x + (inner_w + line_w) / 2, deco_y)
-
-            # أسفل: السعر، الكمية، رقم الهاتف (محاذاة مركزية أو صفّية)
             price_txt = tpl.price or req.price or ""
             mult_txt = tpl.multiplier or "" or req.quantity or ""
             bottom_y = inner_y + padding + 8
 
-            # نص السعر (ذو وزن متوسط)
             if price_txt:
                 price_display = f"Prix(DA):{price_txt} "
                 try:
@@ -359,48 +315,51 @@ def generate_label(req: GenerateRequest):
                 c.setFillColorRGB(*GOLD)
                 c.drawCentredString(inner_x + inner_w / 2, bottom_y + (fs.priceSize * 0.6), price_display)
 
-            # الكمية بجانب السعر (إذا وُجدت)
+            # Quantity with custom color
             if mult_txt:
                 qty_display = f"(×{mult_txt})"
                 try:
                     c.setFont(fs.quantityFont or "Helvetica", fs.quantitySize)
                 except:
                     c.setFont("Helvetica", fs.quantitySize)
-                c.setFillColorRGB(0.86, 0.84, 0.8)
-                # نضعها على يمين السعر قليلاً
+                c.setFillColorRGB(*quantity_rgb)  # Use custom quantity color
                 c.drawString(inner_x + inner_w/2 + 30, bottom_y + (fs.priceSize * 0.6), qty_display)
 
-            # إذا وُجدت إضافات، اطبعها تحت اسم المحل بخط صغير
-            # --- قسم المعلومات الإضافية أسفل اسم المحل ---
             extra = tpl.extraInfo or ""
             if extra:
-             extra_font = "Amiri" if contains_arabic(extra) and "Amiri" in pdfmetrics.getRegisteredFontNames() else (fs.shopFont or "Times-Italic")
-             extra_size = max(7, int(fs.shopSize * 0.85))
-             c.setFont(extra_font, extra_size)
-             c.setFillColorRGB(0.9, 0.88, 0.82)
+                if contains_arabic(extra) and "Amiri" in pdfmetrics.getRegisteredFontNames():
+                    extra_font = "Amiri"
+                else:
+                    extra_font = "Times-Italic"
+                extra_size = fs.extraInfoSize if getattr(fs, "extraInfoSize", None) else max(7, int(fs.shopSize * 0.85))
+                
+                extra_y_center = inner_y + inner_h * 0.30
+                
+                e_style = ParagraphStyle(
+                    name='ExtraInfo',
+                    fontName=extra_font,
+                    fontSize=extra_size,
+                    leading=extra_size * 1.1,
+                    alignment=TA_CENTER,
+                    textColor=colors.Color(*extra_rgb)
+                )
+                e_text = extra.replace('\n', '<br/>')
+                e_p = Paragraph(e_text, e_style)
+                e_w, e_h = e_p.wrap(inner_w, inner_h * 0.25)
+                
+                e_p.drawOn(c, inner_x, extra_y_center - e_h / 2)
 
-             # اجعلها في قسم منفصل أسفل منتصف الملصق
-             extra_y = inner_y + inner_h * 0.20
-             c.drawCentredString(inner_x + inner_w / 2, extra_y, extra)
+                c.setStrokeColorRGB(*GOLD)
+                c.setLineWidth(0.6)
+                line_w = inner_w * 0.3
+                line_y = (extra_y_center - e_h / 2) - 4
+                c.line(inner_x + (inner_w - line_w) / 2, line_y, inner_x + (inner_w + line_w) / 2, line_y)
 
-             # خط زخرفي صغير تحته
-             c.setStrokeColorRGB(*GOLD)
-             c.setLineWidth(0.6)
-             line_w = inner_w * 0.3
-             c.line(inner_x + (inner_w - line_w) / 2, extra_y - 4, inner_x + (inner_w + line_w) / 2, extra_y - 4)
-
-            # رقم الهاتف (إذا وُجد في extra field أو shopName—يمكن إضافة حقل لاحقاً)
-            # إذا أردت استخدام حقل إضافي، أضفه ك tpl.extra.phone أو req.extra_phone
-            # مثال: عرض نص صغير أسفل الجانب الأيمن
-            phone = None
-            # try extra fields
             if isinstance(tpl, dict):
                 phone = tpl.get("phone") or tpl.get("tel")
             else:
-                # TemplateItem يمكن توسيعه لاحقًا
                 phone = getattr(tpl, "phone", None)
             if not phone:
-                # حاول جلب من req (إذا أضفنا حقل لاحقًا)
                 phone = getattr(req, "phone", None)
 
             if phone:
@@ -411,7 +370,6 @@ def generate_label(req: GenerateRequest):
                 c.setFillColorRGB(0.8, 0.78, 0.7)
                 c.drawRightString(inner_x + inner_w - padding - 2, inner_y + 6, phone)
 
-        # رسم الملصقات صفياً وعمودياً
         count = 0
         for r in range(rows):
             for col in range(cols):
@@ -430,7 +388,8 @@ def generate_label(req: GenerateRequest):
     except HTTPException as he:
         raise he
     except Exception as e:
-        # طباعة الخطأ على الطرفية لتسهيل التصحيح
         print("❌ generate_label error:", e)
+        with open("error.log", "a", encoding="utf-8") as f:
+            f.write(f"Error: {str(e)}\n")
+            f.write(traceback.format_exc() + "\n")
         return JSONResponse(status_code=500, content={"error": str(e)})
-# --- End replacement generate_label ---

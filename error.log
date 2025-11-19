@@ -1,0 +1,174 @@
+Error: 
+paragraph text '<para>Miss Dior</para>' caused exception error with style name=PerfumeName Can't map determine family/bold/italic for playfair
+Traceback (most recent call last):
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2878, in _initial_frag
+    frag.fontName, frag.bold, frag.italic = ps2tt(style.fontName)
+                                            ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\fonts.py", line 78, in ps2tt
+    raise ValueError("Can't map determine family/bold/italic for %s" % psfn)
+ValueError: Can't map determine family/bold/italic for playfair
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3218, in parse
+    self.feed(text)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 111, in feed
+    self.goahead(0)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 171, in goahead
+    k = self.parse_starttag(i)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 338, in parse_starttag
+    self.handle_starttag(tag, attrs)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3241, in handle_starttag
+    start(attrs or {})
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2905, in start_para
+    frag = self._initial_frag(attr,_paraAttrMap)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2882, in _initial_frag
+    annotateException('error with style name=%s'%style.name)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 1176, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2878, in _initial_frag
+    frag.fontName, frag.bold, frag.italic = ps2tt(style.fontName)
+                                            ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\fonts.py", line 78, in ps2tt
+    raise ValueError("Can't map determine family/bold/italic for %s" % psfn)
+ValueError: error with style name=PerfumeName Can't map determine family/bold/italic for playfair
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\moino\OneDrive\Bureau\Amin Parfums\perfum_label_backend\main.py", line 434, in generate_label
+    draw_label(x, y, desired[count])
+  File "C:\Users\moino\OneDrive\Bureau\Amin Parfums\perfum_label_backend\main.py", line 333, in draw_label
+    p = Paragraph(p_text, p_style)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paragraph.py", line 1859, in __init__
+    self._setup(text, style, bulletText or getattr(style,'bulletText',None), frags, cleanBlockQuotedText)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paragraph.py", line 1880, in _setup
+    style, frags, bulletTextFrags = _parser.parse(text,style)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3220, in parse
+    annotateException('\nparagraph text %s caused exception' % ascii(text))
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 1176, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3218, in parse
+    self.feed(text)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 111, in feed
+    self.goahead(0)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 171, in goahead
+    k = self.parse_starttag(i)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 338, in parse_starttag
+    self.handle_starttag(tag, attrs)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3241, in handle_starttag
+    start(attrs or {})
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2905, in start_para
+    frag = self._initial_frag(attr,_paraAttrMap)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2882, in _initial_frag
+    annotateException('error with style name=%s'%style.name)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 1176, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2878, in _initial_frag
+    frag.fontName, frag.bold, frag.italic = ps2tt(style.fontName)
+                                            ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\fonts.py", line 78, in ps2tt
+    raise ValueError("Can't map determine family/bold/italic for %s" % psfn)
+ValueError: 
+paragraph text '<para>Miss Dior</para>' caused exception error with style name=PerfumeName Can't map determine family/bold/italic for playfair
+
+Error: 
+paragraph text '<para>Miss Dior</para>' caused exception error with style name=PerfumeName Can't map determine family/bold/italic for playfair
+Traceback (most recent call last):
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2878, in _initial_frag
+    frag.fontName, frag.bold, frag.italic = ps2tt(style.fontName)
+                                            ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\fonts.py", line 78, in ps2tt
+    raise ValueError("Can't map determine family/bold/italic for %s" % psfn)
+ValueError: Can't map determine family/bold/italic for playfair
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3218, in parse
+    self.feed(text)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 111, in feed
+    self.goahead(0)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 171, in goahead
+    k = self.parse_starttag(i)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 338, in parse_starttag
+    self.handle_starttag(tag, attrs)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3241, in handle_starttag
+    start(attrs or {})
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2905, in start_para
+    frag = self._initial_frag(attr,_paraAttrMap)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2882, in _initial_frag
+    annotateException('error with style name=%s'%style.name)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 1176, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2878, in _initial_frag
+    frag.fontName, frag.bold, frag.italic = ps2tt(style.fontName)
+                                            ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\fonts.py", line 78, in ps2tt
+    raise ValueError("Can't map determine family/bold/italic for %s" % psfn)
+ValueError: error with style name=PerfumeName Can't map determine family/bold/italic for playfair
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\moino\OneDrive\Bureau\Amin Parfums\perfum_label_backend\main.py", line 434, in generate_label
+    draw_label(x, y, desired[count])
+  File "C:\Users\moino\OneDrive\Bureau\Amin Parfums\perfum_label_backend\main.py", line 333, in draw_label
+    p = Paragraph(p_text, p_style)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paragraph.py", line 1859, in __init__
+    self._setup(text, style, bulletText or getattr(style,'bulletText',None), frags, cleanBlockQuotedText)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paragraph.py", line 1880, in _setup
+    style, frags, bulletTextFrags = _parser.parse(text,style)
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3220, in parse
+    annotateException('\nparagraph text %s caused exception' % ascii(text))
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 1176, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3218, in parse
+    self.feed(text)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 111, in feed
+    self.goahead(0)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 171, in goahead
+    k = self.parse_starttag(i)
+        ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\html\parser.py", line 338, in parse_starttag
+    self.handle_starttag(tag, attrs)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 3241, in handle_starttag
+    start(attrs or {})
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2905, in start_para
+    frag = self._initial_frag(attr,_paraAttrMap)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2882, in _initial_frag
+    annotateException('error with style name=%s'%style.name)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 1176, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\platypus\paraparser.py", line 2878, in _initial_frag
+    frag.fontName, frag.bold, frag.italic = ps2tt(style.fontName)
+                                            ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\moino\AppData\Local\Programs\Python\Python312\Lib\site-packages\reportlab\lib\fonts.py", line 78, in ps2tt
+    raise ValueError("Can't map determine family/bold/italic for %s" % psfn)
+ValueError: 
+paragraph text '<para>Miss Dior</para>' caused exception error with style name=PerfumeName Can't map determine family/bold/italic for playfair
+
